@@ -6,6 +6,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.player.Input;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.MovementInputUpdateEvent;
 import net.minecraftforge.client.settings.KeyConflictContext;
 import net.minecraftforge.api.distmarker.Dist;
@@ -47,6 +48,9 @@ public class ClientInputHandler {
 
     public static void setPiloting(boolean value) {
         piloting = value;
+        if (!value) {
+            restorePlayerInput(Minecraft.getInstance());
+        }
     }
 
     public static boolean isPiloting() {
@@ -56,7 +60,10 @@ public class ClientInputHandler {
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) return;
+        if (mc.player == null || mc.level == null) {
+            piloting = false;
+            return;
+        }
 
         // START: swap player.input before player.aiStep() reads it.
         if (event.phase == TickEvent.Phase.START) {
@@ -69,7 +76,7 @@ public class ClientInputHandler {
         }
 
         // END: send ship control packet using raw hardware key state.
-        if (mc.level == null || !piloting) {
+        if (!piloting) {
             return;
         }
 
@@ -109,6 +116,12 @@ public class ClientInputHandler {
         }
     }
 
+    @SubscribeEvent
+    public void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        piloting = false;
+        restorePlayerInput(Minecraft.getInstance());
+    }
+
     /**
      * Replaces the player's Input while piloting — zeroes all movement so the
      * player character stays frozen. Restored when piloting ends.
@@ -135,5 +148,11 @@ public class ClientInputHandler {
         input.leftImpulse    = 0f;
         input.jumping        = false;
         input.shiftKeyDown   = false;
+    }
+
+    private static void restorePlayerInput(Minecraft mc) {
+        if (mc.player != null && mc.player.input instanceof FrozenInput fi) {
+            mc.player.input = fi.original;
+        }
     }
 }
