@@ -1,0 +1,9 @@
+{
+  "block.customships.ship_core": "Ship Core",
+  "block.customships.ship_controller": "Ship Controller",
+  "item.customships.ship_core": "Ship Core",
+  "item.customships.ship_controller": "Ship Controller",
+  "itemGroup.customships": "Custom Ships",
+  "key.categories.customships": "Custom Ships",
+  "key.customships.leave_ship": "Leave Ship"
+}

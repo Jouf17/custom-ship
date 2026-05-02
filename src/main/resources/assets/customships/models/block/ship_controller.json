@@ -1,0 +1,81 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "minecraft:block/iron_block",
+    "base": "minecraft:block/iron_block",
+    "panel": "minecraft:block/black_concrete",
+    "screen": "minecraft:block/observer_front",
+    "red": "minecraft:block/redstone_block",
+    "blue": "minecraft:block/lapis_block",
+    "green": "minecraft:block/lime_concrete"
+  },
+  "elements": [
+    {
+      "from": [1, 0, 1],
+      "to": [15, 8, 15],
+      "faces": {
+        "down": { "texture": "#base", "cullface": "down" },
+        "up": { "texture": "#base" },
+        "north": { "texture": "#base" },
+        "south": { "texture": "#base" },
+        "west": { "texture": "#base" },
+        "east": { "texture": "#base" }
+      }
+    },
+    {
+      "from": [2, 8, 2],
+      "to": [14, 10, 14],
+      "faces": {
+        "up": { "texture": "#panel" },
+        "north": { "texture": "#base" },
+        "south": { "texture": "#base" },
+        "west": { "texture": "#base" },
+        "east": { "texture": "#base" }
+      }
+    },
+    {
+      "from": [3, 10, 3],
+      "to": [13, 12, 8],
+      "faces": {
+        "up": { "texture": "#screen" },
+        "north": { "texture": "#panel" },
+        "south": { "texture": "#panel" },
+        "west": { "texture": "#panel" },
+        "east": { "texture": "#panel" }
+      }
+    },
+    {
+      "from": [4, 10, 10],
+      "to": [6, 12, 12],
+      "faces": {
+        "up": { "texture": "#red" },
+        "north": { "texture": "#red" },
+        "south": { "texture": "#red" },
+        "west": { "texture": "#red" },
+        "east": { "texture": "#red" }
+      }
+    },
+    {
+      "from": [7, 10, 10],
+      "to": [9, 12, 12],
+      "faces": {
+        "up": { "texture": "#blue" },
+        "north": { "texture": "#blue" },
+        "south": { "texture": "#blue" },
+        "west": { "texture": "#blue" },
+        "east": { "texture": "#blue" }
+      }
+    },
+    {
+      "from": [10, 10, 10],
+      "to": [12, 12, 12],
+      "faces": {
+        "up": { "texture": "#green" },
+        "north": { "texture": "#green" },
+        "south": { "texture": "#green" },
+        "west": { "texture": "#green" },
+        "east": { "texture": "#green" }
+      }
+    }
+  ]
+}
