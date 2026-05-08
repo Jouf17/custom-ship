@@ -31,15 +31,21 @@ public class ShipControlPacket {
     private static final byte EXIT  = 1 << 6;
 
     private final byte directions;
+    private final int throttleLevel;
     private final float yaw;
 
     public ShipControlPacket(boolean forward, boolean back, boolean left, boolean right,
                              boolean up, boolean down, float yaw) {
-        this(forward, back, left, right, up, down, false, yaw);
+        this(forward, back, left, right, up, down, false, 1, yaw);
     }
 
     public ShipControlPacket(boolean forward, boolean back, boolean left, boolean right,
                              boolean up, boolean down, boolean exit, float yaw) {
+        this(forward, back, left, right, up, down, exit, 1, yaw);
+    }
+
+    public ShipControlPacket(boolean forward, boolean back, boolean left, boolean right,
+                             boolean up, boolean down, boolean exit, int throttleLevel, float yaw) {
         byte d = 0;
         if (forward) d |= FWD;
         if (back)    d |= BACK;
@@ -49,23 +55,27 @@ public class ShipControlPacket {
         if (down)    d |= DOWN;
         if (exit)    d |= EXIT;
         this.directions = d;
+        this.throttleLevel = Math.max(1, throttleLevel);
         this.yaw = yaw;
     }
 
-    private ShipControlPacket(byte directions, float yaw) {
+    private ShipControlPacket(byte directions, int throttleLevel, float yaw) {
         this.directions = directions;
+        this.throttleLevel = Math.max(1, throttleLevel);
         this.yaw = yaw;
     }
 
     public void encode(FriendlyByteBuf buf) {
         buf.writeByte(directions);
+        buf.writeVarInt(throttleLevel);
         buf.writeFloat(yaw);
     }
 
     public static ShipControlPacket decode(FriendlyByteBuf buf) {
         byte directions = buf.readByte();
+        int throttleLevel = buf.readVarInt();
         float yaw = buf.readFloat();
-        return new ShipControlPacket(directions, yaw);
+        return new ShipControlPacket(directions, throttleLevel, yaw);
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
@@ -89,6 +99,7 @@ public class ShipControlPacket {
                     (directions & RIGHT) != 0,
                     (directions & UP)    != 0,
                     (directions & DOWN)  != 0,
+                    throttleLevel,
                     yaw,
                     serverLevel
             );

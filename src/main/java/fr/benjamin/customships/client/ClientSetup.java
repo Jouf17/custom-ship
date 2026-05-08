@@ -1,8 +1,10 @@
 package fr.benjamin.customships.client;
 
 import fr.benjamin.customships.CustomShipsMod;
+import fr.benjamin.customships.registry.ModMenus;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
+import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -18,6 +20,7 @@ public class ClientSetup {
     public static void onClientSetup(FMLClientSetupEvent event) {
         // Register the client tick handler on the Forge event bus
         MinecraftForge.EVENT_BUS.register(new ClientInputHandler());
+        event.enqueueWork(() -> MenuScreens.register(ModMenus.SHIP_CORE.get(), ShipCoreScreen::new));
     }
 
     @net.minecraftforge.eventbus.api.SubscribeEvent

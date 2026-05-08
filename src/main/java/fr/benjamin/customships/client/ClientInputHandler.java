@@ -7,6 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.player.Input;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
+import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.MovementInputUpdateEvent;
 import net.minecraftforge.client.settings.KeyConflictContext;
 import net.minecraftforge.api.distmarker.Dist;
@@ -35,6 +36,7 @@ public class ClientInputHandler {
 
     private static volatile boolean piloting = false;
     private static final int KEEPALIVE_TICKS = 5;
+    private static final int MAX_CLIENT_THROTTLE_LEVEL = 32;
     public static final KeyMapping LEAVE_SHIP_KEY = new KeyMapping(
             "key.customships.leave_ship",
             KeyConflictContext.IN_GAME,
@@ -45,6 +47,8 @@ public class ClientInputHandler {
 
     private int ticksSinceLastSend = 0;
     private boolean lastFwd, lastBack, lastLeft, lastRight, lastUp, lastDown;
+    private int throttleLevel = 1;
+    private int lastSentThrottleLevel = 1;
 
     public static void setPiloting(boolean value) {
         piloting = value;
@@ -82,7 +86,7 @@ public class ClientInputHandler {
 
         if (LEAVE_SHIP_KEY.consumeClick()) {
             ModPackets.sendToServer(new ShipControlPacket(false, false, false, false, false, false, true,
-                    mc.player.getYRot()));
+                    throttleLevel, mc.player.getYRot()));
             return;
         }
 
@@ -95,17 +99,43 @@ public class ClientInputHandler {
 
         boolean changed = fwd   != lastFwd  || back  != lastBack
                        || left  != lastLeft || right != lastRight
-                       || up    != lastUp   || down  != lastDown;
+                       || up    != lastUp   || down  != lastDown
+                       || throttleLevel != lastSentThrottleLevel;
 
         ticksSinceLastSend++;
 
         if (changed || ticksSinceLastSend >= KEEPALIVE_TICKS) {
-            ModPackets.sendToServer(new ShipControlPacket(fwd, back, left, right, up, down,
-                    mc.player.getYRot()));
+            ModPackets.sendToServer(new ShipControlPacket(fwd, back, left, right, up, down, false,
+                    throttleLevel, mc.player.getYRot()));
             lastFwd   = fwd;   lastBack  = back;
             lastLeft  = left;  lastRight = right;
             lastUp    = up;    lastDown  = down;
+            lastSentThrottleLevel = throttleLevel;
             ticksSinceLastSend = 0;
+        }
+    }
+
+    @SubscribeEvent
+    public void onMouseScroll(InputEvent.MouseScrollingEvent event) {
+        if (!piloting) {
+            return;
+        }
+        double delta = event.getScrollDelta();
+        if (delta == 0.0D) {
+            return;
+        }
+
+        throttleLevel = Math.max(1, Math.min(MAX_CLIENT_THROTTLE_LEVEL,
+                throttleLevel + (delta > 0.0D ? 1 : -1)));
+        event.setCanceled(true);
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) {
+            mc.player.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal("Vitesse " + throttleLevel),
+                    true
+            );
+            ticksSinceLastSend = KEEPALIVE_TICKS;
         }
     }
 

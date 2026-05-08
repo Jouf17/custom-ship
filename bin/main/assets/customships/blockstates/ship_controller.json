@@ -1,7 +1,19 @@
 {
   "variants": {
-    "": {
+    "facing=north": {
+      "model": "customships:block/ship_controller",
+      "y": 180
+    },
+    "facing=south": {
       "model": "customships:block/ship_controller"
+    },
+    "facing=west": {
+      "model": "customships:block/ship_controller",
+      "y": 90
+    },
+    "facing=east": {
+      "model": "customships:block/ship_controller",
+      "y": 270
     }
   }
 }

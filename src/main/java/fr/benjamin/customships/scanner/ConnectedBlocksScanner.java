@@ -6,7 +6,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.HashSet;
@@ -15,7 +14,6 @@ import java.util.Set;
 
 /**
  * BFS flood-fill to find all solid blocks connected to a starting block.
- * Returns null if the connected structure exceeds maxBlocks.
  */
 public class ConnectedBlocksScanner {
 
@@ -24,13 +22,11 @@ public class ConnectedBlocksScanner {
     /**
      * Scans all solid, non-fluid blocks connected (6-directional) to {@code start}.
      *
-     * @param level     the server world
-     * @param start     the origin block (Ship Core position)
-     * @param maxBlocks hard limit; returns null if exceeded
-     * @return the set of connected block positions, or null if too large
+     * @param level the server world
+     * @param start the origin block (Ship Core position)
+     * @return the set of connected block positions
      */
-    @Nullable
-    public static Set<BlockPos> scan(ServerLevel level, BlockPos start, int maxBlocks) {
+    public static Set<BlockPos> scan(ServerLevel level, BlockPos start) {
         Set<BlockPos> visited = new HashSet<>();
         Queue<BlockPos> queue = new ArrayDeque<>();
 
@@ -52,12 +48,6 @@ public class ConnectedBlocksScanner {
                 }
 
                 visited.add(neighbor);
-
-                // Abort if the structure is too large
-                if (visited.size() > maxBlocks) {
-                    return null;
-                }
-
                 queue.add(neighbor);
             }
         }

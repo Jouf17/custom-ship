@@ -39,6 +39,13 @@ public class ModPackets {
                 PilotStatePacket::decode,
                 PilotStatePacket::handle,
                 Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+
+        CHANNEL.registerMessage(id++,
+                ShipCoreActionPacket.class,
+                ShipCoreActionPacket::encode,
+                ShipCoreActionPacket::decode,
+                ShipCoreActionPacket::handle,
+                Optional.of(NetworkDirection.PLAY_TO_SERVER));
     }
 
     public static void sendToPlayer(Object packet, ServerPlayer player) {

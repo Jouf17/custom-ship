@@ -3,25 +3,32 @@ package fr.benjamin.customships.control;
 import fr.benjamin.customships.CustomShipsMod;
 import fr.benjamin.customships.assembly.ShipAssemblerHelper;
 import fr.benjamin.customships.assembly.ShipControllerAttachment;
+import fr.benjamin.customships.assembly.ShipStatsScanner;
+import fr.benjamin.customships.assembly.ShipStatsScanner.ShipStats;
 import fr.benjamin.customships.config.ModConfig;
 import fr.benjamin.customships.network.ModPackets;
 import fr.benjamin.customships.network.PilotStatePacket;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.server.ServerLifecycleHooks;
+import org.joml.Vector3d;
 import org.jetbrains.annotations.Nullable;
+import org.valkyrienskies.core.api.bodies.properties.BodyTransform;
 import org.valkyrienskies.core.api.ships.LoadedServerShip;
 import org.valkyrienskies.mod.common.ValkyrienSkiesMod;
 import org.valkyrienskies.mod.common.entity.ShipMountingEntity;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -43,17 +50,23 @@ public class ShipControlManager {
         final ShipMountingEntity mount;
         final boolean originalNoGravity;
         final boolean originalNoPhysics;
+        double lastPlayerY;
+        int statusTicks = 0;
+        int throttleLevel = 1;
+        int requestedThrottleLevel = 1;
 
-        PilotData(long shipId, ServerLevel level, ShipMountingEntity mount, boolean originalNoGravity, boolean originalNoPhysics) {
+        PilotData(long shipId, ServerLevel level, ShipMountingEntity mount, boolean originalNoGravity, boolean originalNoPhysics, double lastPlayerY) {
             this.shipId = shipId;
             this.level = level;
             this.mount = mount;
             this.originalNoGravity = originalNoGravity;
             this.originalNoPhysics = originalNoPhysics;
+            this.lastPlayerY = lastPlayerY;
         }
     }
 
     private final Map<UUID, PilotData> pilots = new HashMap<>();
+    private int registrySyncTicks = 0;
 
     // -----------------------------------------------------------------------
     // Public API
@@ -70,7 +83,13 @@ public class ShipControlManager {
             return false;
         }
 
-        ship.getOrPutAttachment(ShipControllerAttachment.class, ShipControllerAttachment::new);
+        ShipControllerAttachment controller = ship.getOrPutAttachment(ShipControllerAttachment.class, ShipControllerAttachment::new);
+        refreshShipStats(level, controllerPos, ship, controller);
+        if (!controller.hasCore()) {
+            CustomShipsMod.LOGGER.warn("[CustomShips] Refusing to start piloting ship {} because it has no active core", ship.getId());
+            return false;
+        }
+        controller.setPiloted(true);
 
         ShipMountingEntity mount = createShipMount(level, controllerPos);
         if (mount == null) {
@@ -88,7 +107,8 @@ public class ShipControlManager {
                 level,
                 mount,
                 player.isNoGravity(),
-                player.noPhysics
+                player.noPhysics,
+                player.getY()
         ));
         ModPackets.sendToPlayer(new PilotStatePacket(true), player);
         CustomShipsMod.LOGGER.info("[CustomShips] Player {} started piloting ship {}",
@@ -118,6 +138,7 @@ public class ShipControlManager {
                                    boolean forward, boolean back,
                                    boolean left, boolean right,
                                    boolean up, boolean down,
+                                   int throttleLevel,
                                    float yaw,
                                    ServerLevel level) {
         PilotData data = pilots.get(player.getUUID());
@@ -136,8 +157,20 @@ public class ShipControlManager {
             controller = new ShipControllerAttachment();
             ship.setAttachment(controller);
         }
+        if (!controller.hasCore()) {
+            stopPiloting(player);
+            return;
+        }
 
-        double speed = ModConfig.SHIP_SPEED.get();
+        controller.setPiloted(true);
+        int appliedThrottle = controller.setThrottleLevel(throttleLevel);
+        if (throttleLevel != data.requestedThrottleLevel || appliedThrottle != data.throttleLevel) {
+            data.requestedThrottleLevel = throttleLevel;
+            data.throttleLevel = appliedThrottle;
+            player.displayClientMessage(Component.literal("Vitesse " + appliedThrottle + "/" + controller.getMaxThrottleLevel()), true);
+        }
+
+        double speed = controller.getMaxSpeed(ModConfig.SHIP_SPEED.get());
 
         double fwdSpeed = ((forward ? 1 : 0) - (back  ? 1 : 0)) * speed;
         double vy       =  up   ? speed : (down  ? -speed : 0.0);
@@ -162,14 +195,32 @@ public class ShipControlManager {
             if (player == null) continue;
 
             LoadedServerShip ship = ShipAssemblerHelper.getLoadedShipById(data.level, data.shipId);
+            if (ship != null && data.mount.isAlive()) {
+                handleVerticalWrap(player, data, ship);
+            }
+
             if (ship == null || !data.mount.isAlive() || player.getVehicle() != data.mount) {
                 pilots.remove(uuid);
                 zeroShipVelocity(data);
                 restorePlayerPhysics(player, data);
                 removeMount(data);
                 ModPackets.sendToPlayer(new PilotStatePacket(false), player);
+            } else {
+                displayPilotStatus(player, data, ship);
+                data.lastPlayerY = player.getY();
             }
         }
+
+        registrySyncTicks++;
+        if (registrySyncTicks >= 20) {
+            registrySyncTicks = 0;
+            CustomShipsMod.ships().syncLoadedPositions(server);
+        }
+    }
+
+    @SubscribeEvent
+    public void onServerStopping(ServerStoppingEvent event) {
+        CustomShipsMod.ships().syncLoadedPositions(event.getServer());
     }
 
     // -----------------------------------------------------------------------
@@ -217,6 +268,47 @@ public class ShipControlManager {
         if (ctrl != null) ctrl.stop();
     }
 
+    private void handleVerticalWrap(ServerPlayer player, PilotData data, LoadedServerShip ship) {
+        double dy = player.getY() - data.lastPlayerY;
+        double worldHeight = data.level.getMaxBuildHeight() - data.level.getMinBuildHeight();
+        if (Math.abs(dy) < worldHeight * 0.75D) {
+            return;
+        }
+
+        BodyTransform transform = ship.getTransform();
+        Vector3d newPosition = new Vector3d(transform.getPosition()).add(0.0D, dy, 0.0D);
+        BodyTransform moved = ValkyrienSkiesMod.getVsCore().newBodyTransform(
+                newPosition,
+                transform.getRotation(),
+                transform.getScaling(),
+                transform.getPositionInModel()
+        );
+        ship.unsafeSetTransform(moved);
+        data.mount.setPos(data.mount.getX(), data.mount.getY() + dy, data.mount.getZ());
+        if (player.getVehicle() != data.mount) {
+            player.startRiding(data.mount, true);
+        }
+        CustomShipsMod.ships().updateLastPositionByVsShipId(data.shipId, newPosition.x(), newPosition.y(), newPosition.z());
+        CustomShipsMod.LOGGER.info("[CustomShips] Ship {} followed pilot vertical wrap by {} blocks", data.shipId, dy);
+    }
+
+    private void displayPilotStatus(ServerPlayer player, PilotData data, LoadedServerShip ship) {
+        data.statusTicks++;
+        if (data.statusTicks < 5) {
+            return;
+        }
+        data.statusTicks = 0;
+
+        Vector3d velocity = new Vector3d(ship.getVelocity());
+        double speed = velocity.length();
+        player.displayClientMessage(Component.literal(String.format(
+                Locale.ROOT,
+                "Vitesse %.1f blocs/s | Throttle %d",
+                speed,
+                data.throttleLevel
+        )), true);
+    }
+
     private void restorePlayerPhysics(ServerPlayer player, PilotData data) {
         if (player.getVehicle() == data.mount) {
             player.stopRiding();
@@ -244,6 +336,19 @@ public class ShipControlManager {
         if (data.mount.isAlive()) {
             data.mount.discard();
         }
+    }
+
+    private void refreshShipStats(ServerLevel level, BlockPos controllerPos, LoadedServerShip ship, ShipControllerAttachment controller) {
+        ShipStats stats = ShipStatsScanner.scan(level, controllerPos);
+        if (stats == null) {
+            CustomShipsMod.LOGGER.warn("[CustomShips] Could not refresh ship {} stats from controller at {}; keeping previous stats",
+                    ship.getId(), controllerPos);
+            return;
+        }
+
+        controller.setShipStats(stats.blockCount(), stats.coreCount(), stats.reactorCount(), stats.stabilizerCount());
+        CustomShipsMod.LOGGER.info("[CustomShips] Refreshed ship {} stats before piloting: blocks={}, cores={}, reactors={}, stabilizers={}",
+                ship.getId(), stats.blockCount(), stats.coreCount(), stats.reactorCount(), stats.stabilizerCount());
     }
 
     @Nullable

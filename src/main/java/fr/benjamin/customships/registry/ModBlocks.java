@@ -3,6 +3,8 @@ package fr.benjamin.customships.registry;
 import fr.benjamin.customships.CustomShipsMod;
 import fr.benjamin.customships.block.ShipControllerBlock;
 import fr.benjamin.customships.block.ShipCoreBlock;
+import fr.benjamin.customships.block.ShipPartBlock;
+import fr.benjamin.customships.assembly.ShipPartStatsUpdater.ShipPartType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -33,6 +35,28 @@ public class ModBlocks {
                     .strength(3.5f, 6.0f)
                     .sound(SoundType.METAL)
                     .noOcclusion()
+            )
+    );
+
+    public static final RegistryObject<Block> SHIP_REACTOR = BLOCKS.register("ship_reactor",
+            () -> new ShipPartBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .requiresCorrectToolForDrops()
+                    .strength(4.0f, 8.0f)
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> 6),
+                    ShipPartType.REACTOR
+            )
+    );
+
+    public static final RegistryObject<Block> SHIP_STABILIZER = BLOCKS.register("ship_stabilizer",
+            () -> new ShipPartBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.DIAMOND)
+                    .requiresCorrectToolForDrops()
+                    .strength(4.0f, 8.0f)
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> 4),
+                    ShipPartType.STABILIZER
             )
     );
 }

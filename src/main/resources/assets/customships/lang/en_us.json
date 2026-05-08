@@ -1,8 +1,12 @@
 {
   "block.customships.ship_core": "Ship Core",
   "block.customships.ship_controller": "Ship Controller",
+  "block.customships.ship_reactor": "Ship Reactor",
+  "block.customships.ship_stabilizer": "Ship Stabilizer",
   "item.customships.ship_core": "Ship Core",
   "item.customships.ship_controller": "Ship Controller",
+  "item.customships.ship_reactor": "Ship Reactor",
+  "item.customships.ship_stabilizer": "Ship Stabilizer",
   "itemGroup.customships": "Custom Ships",
   "key.categories.customships": "Custom Ships",
   "key.customships.leave_ship": "Leave Ship"
